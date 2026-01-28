@@ -1,110 +1,95 @@
--- HUB ÚNICO: Scanner + Testador de Códigos (Legal)
+-- HUB SIMPLES - INVIS + NOCLIP
+-- Funciona em Player e Vehicle
 
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local player = game.Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
--- CONFIG (AJUSTE AO JOGO)
-local REDEEM_TEXTBOX_NAME = "CodeBox"   -- nome do TextBox
-local REDEEM_BUTTON_NAME  = "Redeem"    -- nome do botão
+local ativo = false
+local noclipConn
 
--- PADRÕES DE CÓDIGO
-local patterns = {
-	"%w%w%w%w%-%w%w%w%w",
-	"%u%u%d%d%-%u%u%d%d"
-}
+-- GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "HubInvis"
 
-local codes = {}
-local tested = {}
-local count = 0
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 200, 0, 60)
+btn.Position = UDim2.new(0, 20, 0.5, -30)
+btn.Text = "OFF"
+btn.TextSize = 24
+btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.BorderSizePixel = 0
+btn.Font = Enum.Font.SourceSansBold
+btn.Draggable = true
+btn.Active = true
 
--- UI
-local gui = Instance.new("ScreenGui", player.PlayerGui)
-gui.Name = "CodeHub"
-gui.ResetOnSpawn = false
+-- FUNÇÕES
+local function setInvisible(state)
+	local char = player.Character
+	if not char then return end
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 300, 0, 340)
-frame.Position = UDim2.new(0.02,0,0.25,0)
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-
-local layout = Instance.new("UIListLayout", frame)
-layout.Padding = UDim.new(0,5)
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,-10,0,30)
-title.Text = "CODE HUB"
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1
-
--- ADD CÓDIGO
-local function addCode(code)
-	if tested[code] then return end
-	for _,v in ipairs(codes) do
-		if v == code then return end
-	end
-
-	count += 1
-	codes[#codes+1] = code
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1,-10,0,26)
-	lbl.BackgroundColor3 = Color3.fromRGB(35,35,35)
-	lbl.TextColor3 = Color3.fromRGB(255,255,0)
-	lbl.Text = "cod"..count..": "..code.." [PENDENTE]"
-	lbl:SetAttribute("Code", code)
-	lbl.Parent = frame
-end
-
--- SCAN UI
-local function scan(obj)
-	if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-		for _,p in ipairs(patterns) do
-			for code in string.gmatch(obj.Text, p) do
-				addCode(code)
-			end
+	for _,v in pairs(char:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.Transparency = state and 1 or 0
+			v.CanCollide = not state
+		end
+		if v:IsA("Decal") then
+			v.Transparency = state and 1 or 0
 		end
 	end
-	for _,c in ipairs(obj:GetChildren()) do
-		scan(c)
-	end
 end
 
--- LOOP SCAN
-task.spawn(function()
-	while true do
-		scan(player.PlayerGui)
-		task.wait(2)
-	end
-end)
-
--- LOOP TESTE
-task.spawn(function()
-	while true do
-		for _,lbl in ipairs(frame:GetChildren()) do
-			if lbl:IsA("TextLabel") and lbl:GetAttribute("Code") then
-				local code = lbl:GetAttribute("Code")
-				if not tested[code] then
-					tested[code] = true
-
-					local box = player.PlayerGui:FindFirstChild(REDEEM_TEXTBOX_NAME, true)
-					local btn = player.PlayerGui:FindFirstChild(REDEEM_BUTTON_NAME, true)
-
-					if box and btn and box:IsA("TextBox") then
-						box.Text = code
-						task.wait(0.2)
-						btn:Activate()
-
-						lbl.Text = lbl.Text:gsub("%[PENDENTE%]", "[TESTADO]")
-						lbl.TextColor3 = Color3.fromRGB(0,255,0)
-					else
-						lbl.Text = lbl.Text:gsub("%[PENDENTE%]", "[ERRO UI]")
-						lbl.TextColor3 = Color3.fromRGB(255,0,0)
+local function noclip(state)
+	if state then
+		noclipConn = RunService.Stepped:Connect(function()
+			local char = player.Character
+			if char then
+				for _,v in pairs(char:GetDescendants()) do
+					if v:IsA("BasePart") then
+						v.CanCollide = false
 					end
-
-					task.wait(1)
 				end
 			end
+		end)
+	else
+		if noclipConn then
+			noclipConn:Disconnect()
+			noclipConn = nil
 		end
-		task.wait(2)
+	end
+end
+
+local function invisVehicle(state)
+	local char = player.Character
+	if not char then return end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.SeatPart and hum.SeatPart.Parent then
+		for _,v in pairs(hum.SeatPart.Parent:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.Transparency = state and 1 or 0
+				v.CanCollide = not state
+			end
+		end
+	end
+end
+
+-- BOTÃO
+btn.MouseButton1Click:Connect(function()
+	ativo = not ativo
+
+	if ativo then
+		btn.Text = "ON"
+		btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		setInvisible(true)
+		noclip(true)
+		invisVehicle(true)
+	else
+		btn.Text = "OFF"
+		btn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+		setInvisible(false)
+		noclip(false)
+		invisVehicle(false)
 	end
 end)
